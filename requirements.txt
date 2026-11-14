@@ -1,0 +1,3 @@
+flask>=3.0
+# Production web server for hosting (Render, Railway, etc.). Not needed to run locally.
+gunicorn>=22.0; sys_platform != "win32"
