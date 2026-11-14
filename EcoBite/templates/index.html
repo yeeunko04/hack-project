@@ -12,58 +12,107 @@
 <body>
 
 <header class="masthead">
-  <h1>This week's Maxi specials, turned into dinner</h1>
-  <p>Pick the sale items you want to use, set a budget, and get recipes with the total cost and what you save.</p>
+  <div class="logos">
+    {% for store, file in store_logos.items() %}
+    <img class="logo" src="{{ url_for('static', filename=file) }}" alt="{{ store }}">
+    {% endfor %}
+  </div>
+  <h1>This week's grocery specials, turned into dinner</h1>
+  <p>Set a budget, optionally tell us what you'd like to use, and get recipes with the total cost and what you save.</p>
 </header>
 
 <main class="layout">
 
   <!-- ===================== Search form ===================== -->
-  <form class="panel finder" method="get" action="{{ url_for('home') }}">
+  <form id="finder" class="panel finder" method="get" action="{{ url_for('home') }}">
 
     <div class="field-row">
       <label class="field">
         <span class="field-name">Type of food</span>
         <select name="food_type">
           <option value="">Any type</option>
-          {% for t in food_types %}
-          <option value="{{ t }}" {% if t == food_type %}selected{% endif %}>{{ t }}</option>
-          {% endfor %}
+          <optgroup label="Cuisine">
+            {% for c in cuisines %}
+            <option value="cuisine:{{ c }}" {% if food_type == 'cuisine:' ~ c %}selected{% endif %}>{{ c }}</option>
+            {% endfor %}
+          </optgroup>
+          <optgroup label="Feeling">
+            {% for f in feelings %}
+            <option value="feeling:{{ f }}" {% if food_type == 'feeling:' ~ f %}selected{% endif %}>{{ f }}</option>
+            {% endfor %}
+          </optgroup>
         </select>
       </label>
 
       <label class="field">
-        <span class="field-name">Your budget ($)</span>
-        <input type="number" name="budget" min="1" step="0.5" inputmode="decimal"
-               placeholder="e.g. 25" value="{{ budget_text }}">
+        <span class="field-name">
+          Your budget:
+          <output id="budget-out">{% if budget %}${{ "%g"|format(budget) }}{% else %}No limit{% endif %}</output>
+        </span>
+        <input type="range" id="budget" name="budget" min="0" max="200" step="1"
+               value="{{ (budget or 0)|int }}"
+               oninput="document.getElementById('budget-out').textContent = this.value > 0 ? '$' + this.value : 'No limit'">
+        <span class="range-scale"><span>$0</span><span>$200</span></span>
       </label>
     </div>
 
-    <div class="picker-head">
-      <h2>Ingredients to use</h2>
-      <input type="search" id="filter" placeholder="Search ingredients" aria-label="Search ingredients">
-    </div>
-
-    {% for category, items in grouped.items() %}
-    <fieldset class="category">
-      <legend>{{ category }}</legend>
-      <div class="chips">
-        {% for item in items %}
-        <label class="chip" data-name="{{ item.name|lower }}">
-          <input type="checkbox" name="ingredients" value="{{ item.id }}"
-                 {% if item.id in selected_ids %}checked{% endif %}>
-          <span class="chip-body">
-            <span class="chip-name">{{ item.name }}</span>
-            <span class="chip-price">
-              ${{ "%.2f"|format(item.price) }}
-              {% if item.money_saved > 0 %}<em>save ${{ "%.2f"|format(item.money_saved) }}</em>{% endif %}
-            </span>
-          </span>
+    <fieldset class="restrictions stores">
+      <legend class="field-name">Where do you shop? <span class="optional">(we'll find the cheapest price across the stores you pick)</span></legend>
+      <div class="restriction-list">
+        {% for name in store_names %}
+        <label class="restriction">
+          <input type="checkbox" name="stores" value="{{ name }}"
+                 {% if name in active_stores %}checked{% endif %}>
+          {% if name in store_logos %}
+          <span class="store-pill"><img src="{{ url_for('static', filename=store_logos[name]) }}" alt="{{ name }}"></span>
+          {% else %}
+          <span>{{ name }}</span>
+          {% endif %}
         </label>
         {% endfor %}
       </div>
     </fieldset>
-    {% endfor %}
+
+    <fieldset class="restrictions">
+      <legend class="field-name">Food restrictions <span class="optional">(allergies and intolerances to avoid)</span></legend>
+      <div class="restriction-list">
+        {% for name in restriction_names %}
+        <label class="restriction">
+          <input type="checkbox" name="restrictions" value="{{ name }}"
+                 {% if name in restrictions %}checked{% endif %}>
+          <span>{{ name }}</span>
+        </label>
+        {% endfor %}
+      </div>
+    </fieldset>
+
+    <div class="picker">
+      <label class="field-name" for="filter">Ingredients you'd like to use <span class="optional">(optional suggestions)</span></label>
+
+      <div class="search-box" id="search-box">
+        <span class="picked" id="picked"></span>
+        <input type="search" id="filter" class="big-search" autocomplete="off"
+               placeholder="Search this week's specials, e.g. chicken, tomato, milk">
+
+        <div class="suggest" id="suggest">
+          <span class="suggest-label" id="suggest-label">Suggestions</span>
+          <div class="suggest-list" id="suggest-list"></div>
+        </div>
+      </div>
+
+      <!-- Source of truth for the form: one hidden checkbox per product -->
+      <div hidden id="store">
+        {% for item in ingredients %}
+        <input type="checkbox" name="ingredients" value="{{ item.name }}"
+               data-name="{{ item.name|lower }} {{ item.matches|join(' ') }}"
+               data-label="{{ item.name }}"
+               data-allergens="{{ item.allergens|join('|') }}"
+               data-price="{{ '%.2f'|format(item.price) }}"
+               {% if item.name in popular_names %}data-popular="1"{% endif %}
+               {% if item.name in selected_names %}checked{% endif %}>
+        {% endfor %}
+      </div>
+    </div>
 
     <div class="form-actions">
       <button type="submit" class="btn">Find recipes</button>
@@ -79,21 +128,34 @@
       <div class="panel empty">
         <h2>No recipes match yet</h2>
         <p>
-          None of this week's recipes use the ingredients you picked
-          {% if food_type %}in the {{ food_type }} category{% endif %}.
-          Try picking more ingredients, or set the food type to "Any type".
+          No recipes {% if cuisine or feeling %}for {{ [cuisine, feeling]|select|join(' and ') }} {% endif %}can be made from this week's specials.
+          Try setting the cuisine and feeling to "Any"{% if restrictions %} or removing a food restriction{% endif %}.
         </p>
       </div>
     {% else %}
+
+      <div class="sortbar">
+        <label for="sort">Sort recipes by</label>
+        <select id="sort" name="sort" form="finder" onchange="this.form.submit()">
+          <option value="">Best match</option>
+          {% for key, label in sorts.items() %}
+          <option value="{{ key }}" {% if key == sort %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
 
       <h2 class="results-title">
         {{ within|length }} recipe{{ '' if within|length == 1 else 's' }}
         {% if budget %}within ${{ "%.2f"|format(budget) }}{% else %}found{% endif %}
       </h2>
 
+      {% if hidden_count %}
+      <p class="note">{{ hidden_count }} recipe{{ '' if hidden_count == 1 else 's' }} hidden because of your food restrictions ({{ restrictions|join(', ') }}).</p>
+      {% endif %}
+
       {% if unused_picks %}
       <p class="note">
-        No recipe uses: {% for i in unused_picks %}{{ i.name }}{% if not loop.last %}, {% endif %}{% endfor %}.
+        None of this week's recipes use: {% for i in unused_picks %}{{ i }}{% if not loop.last %}, {% endif %}{% endfor %}.
       </p>
       {% endif %}
 
@@ -102,11 +164,15 @@
         <header class="card-head">
           <div>
             <h3>{{ r.recipe.name }}</h3>
-            <p class="meta">{{ r.recipe.type }}, {{ r.recipe.time }}{% if selected_ids %}. Uses {{ r.selected_used|length }} of your {{ selected_ids|length }} picks{% endif %}</p>
+            {% if r.recipe.url %}<span class="web-badge">From the web</span>{% endif %}
+            {% if r.allergens %}<p class="contains">Contains: {{ r.allergens|join(', ') }}</p>{% endif %}
+            <p class="shop">Shop at {{ r.stores|join(' + ') }}</p>
+            <p class="meta">{{ r.recipe.cuisine }}{% if r.recipe.feelings %}, {{ r.recipe.feelings|join(', ')|lower }}{% endif %}, {{ r.recipe.time }}, serves {{ r.servings }}{% if selected_names %}. Uses {{ r.selected_used|length }} of your {{ selected_names|length }} picks{% endif %}</p>
           </div>
 
-          <div class="tag" aria-label="Total price">
-            <span class="tag-total">${{ "%.2f"|format(r.total) }}</span>
+          <div class="tag" aria-label="Price per meal and total price">
+            <span class="tag-total">${{ "%.2f"|format(r.per_meal) }} <small>per meal</small></span>
+            <span class="tag-meal">${{ "%.2f"|format(r.total) }} total</span>
             {% if r.saved > 0 %}
             <span class="tag-save">save ${{ "%.2f"|format(r.saved) }}</span>
             {% endif %}
@@ -121,34 +187,43 @@
           {% endif %}
         {% endif %}
 
-        <table class="lines">
-          <thead>
-            <tr><th>Ingredient</th><th>Product on special</th><th class="num">Price</th><th class="num">Saved</th></tr>
-          </thead>
-          <tbody>
-            {% for line in r.lines %}
-            <tr class="{{ 'pick' if line.user_pick else '' }}">
-              <td>{{ line.label }}</td>
-              <td>
-                {{ line.item.name }}
-                {% if line.user_pick %}<span class="badge">your pick</span>{% endif %}
-              </td>
-              <td class="num">${{ "%.2f"|format(line.item.price) }}</td>
-              <td class="num">{% if line.item.money_saved > 0 %}${{ "%.2f"|format(line.item.money_saved) }}{% else %}-{% endif %}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-          <tfoot>
-            <tr>
-              <td colspan="2">Regular price ${{ "%.2f"|format(r.regular_price) }}</td>
-              <td class="num">${{ "%.2f"|format(r.total) }}</td>
-              <td class="num">${{ "%.2f"|format(r.saved) }}</td>
-            </tr>
-          </tfoot>
-        </table>
+        <details class="ingredients">
+          <summary>Ingredients and prices</summary>
+          <table class="lines">
+            <tbody>
+              {% for line in r.lines %}
+              <tr class="{{ 'pick' if line.user_pick else '' }}">
+                <td>
+                  <span class="line-label">{{ line.label }}</span>
+                  <span class="line-product">
+                    {{ line.item.name }} <span class="line-store">at {{ line.item.store }}</span>
+                    {% if line.user_pick %}<span class="badge">your pick</span>{% endif %}
+                  </span>
+                  {% if line.item.money_saved > 0 %}<span class="line-save">save ${{ "%.2f"|format(line.item.money_saved) }}</span>{% endif %}
+                </td>
+                <td class="num">${{ "%.2f"|format(line.item.price) }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td>Total{% if r.saved > 0 %} <span class="line-save">(regular ${{ "%.2f"|format(r.regular_price) }})</span>{% endif %}</td>
+                <td class="num">${{ "%.2f"|format(r.total) }}</td>
+              </tr>
+            </tfoot>
+          </table>
+          {% if r.single_store %}
+          <p class="single-store"><strong>All at one store:</strong>
+            {% for store, total in r.single_store %}{{ store }} ${{ "%.2f"|format(total) }}{% if not loop.last %}, {% endif %}{% endfor %}
+          </p>
+          {% endif %}
+          {% if r.recipe.pantry %}
+          <p class="pantry"><strong>From your pantry:</strong> {{ r.recipe.pantry|join(", ") }}</p>
+          {% endif %}
+        </details>
 
-        {% if r.recipe.pantry %}
-        <p class="pantry"><strong>From your pantry:</strong> {{ r.recipe.pantry|join(", ") }}</p>
+        {% if r.recipe.url %}
+        <a class="source-link" href="{{ r.recipe.url }}" target="_blank" rel="noopener noreferrer">View full recipe on {{ r.recipe.source }} &#8599;</a>
         {% endif %}
 
         <details class="steps">
@@ -172,8 +247,9 @@
       {% endif %}
 
       <p class="fine-print">
-        Prices are for the whole package as sold, so you may have leftovers.
+        Prices are for the whole package as sold, so you may have leftovers. Each ingredient uses the cheapest matching special across the stores you chose.
         Pantry items are not included in the totals.
+        Food restriction filters are a best guess from product and ingredient names. Always check package labels if you have an allergy.
       </p>
     {% endif %}
   </section>
@@ -182,17 +258,76 @@
 </main>
 
 <script>
-  // Live filter for the ingredient list
   const filter = document.getElementById("filter");
-  filter.addEventListener("input", () => {
+  const picked = document.getElementById("picked");
+  const suggestList = document.getElementById("suggest-list");
+  const suggestLabel = document.getElementById("suggest-label");
+  const boxes = [...document.querySelectorAll("#store input")];
+
+  function button(cls, text, onClick) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = cls;
+    b.textContent = text;
+    b.addEventListener("click", onClick);
+    return b;
+  }
+
+  function toggle(box, on) {
+    box.checked = on;
+    render();
+    filter.focus();
+  }
+
+  function avoided() {
+    return [...document.querySelectorAll("input[name=restrictions]:checked")].map(r => r.value);
+  }
+
+  function blocked(box) {
+    const bad = avoided();
+    return box.dataset.allergens.split("|").some(a => a && bad.includes(a));
+  }
+
+  function render() {
     const q = filter.value.trim().toLowerCase();
-    document.querySelectorAll(".chip").forEach(chip => {
-      chip.hidden = q && !chip.dataset.name.includes(q);
-    });
-    document.querySelectorAll(".category").forEach(group => {
-      group.hidden = !group.querySelector(".chip:not([hidden])");
-    });
+    boxes.forEach(b => { if (blocked(b)) b.checked = false; });  // can't pick what you avoid
+
+    // Chosen ingredients live inside the search bar as removable tags
+    picked.replaceChildren(...boxes.filter(b => b.checked).map(box =>
+      button("pick-tag", box.dataset.label + " ×", () => toggle(box, false))
+    ));
+
+    // Buttons under the bar: popular picks, or search matches while typing
+    const options = boxes.filter(b => !b.checked && !blocked(b) &&
+      (q ? b.dataset.name.includes(q) : b.dataset.popular === "1"));
+
+    suggestLabel.textContent = q
+      ? (options.length ? "Search results" : "No specials match that search")
+      : (options.length ? "Suggestions" : "");
+
+    document.getElementById("suggest").hidden = !suggestLabel.textContent;
+
+    suggestList.replaceChildren(...options.slice(0, 12).map(box =>
+      button("suggest-btn", "+ " + box.dataset.label,() => toggle(box, true))
+    ));
+  }
+
+  filter.addEventListener("input", render);
+  filter.addEventListener("keydown", e => {
+    if (e.key === "Enter") {
+      e.preventDefault();  // don't submit; add the top match instead
+      const first = suggestList.querySelector(".suggest-btn");
+      if (first && filter.value.trim()) first.click();
+    } else if (e.key === "Backspace" && !filter.value) {
+      const last = [...boxes].reverse().find(b => b.checked);
+      if (last) toggle(last, false);
+    }
   });
+  document.getElementById("search-box").addEventListener("click", () => filter.focus());
+
+  document.querySelectorAll("input[name=restrictions]").forEach(r => r.addEventListener("change", render));
+
+  render();
 </script>
 
 </body>
