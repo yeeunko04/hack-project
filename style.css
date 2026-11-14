@@ -1,0 +1,442 @@
+/* Maxi Specials Recipe Finder
+   Look: grocery flyer. Cool mint paper, deep green ink, and yellow price tags. */
+
+:root {
+  --paper: #f1f6f2;
+  --panel: #ffffff;
+  --ink: #14352a;
+  --ink-soft: #4a645a;
+  --line: #d3e0d7;
+  --green: #1f7a4d;
+  --green-pale: #e2f1e8;
+  --tag: #ffd84d;
+  --sale: #c8283c;
+  --sale-pale: #fdecee;
+
+  --font-display: "Bricolage Grotesque", "Trebuchet MS", system-ui, sans-serif;
+  --font-body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 1rem;
+  line-height: 1.55;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-display);
+  line-height: 1.15;
+  margin: 0;
+}
+
+:focus-visible {
+  outline: 3px solid var(--green);
+  outline-offset: 2px;
+}
+
+[hidden] { display: none !important; }
+
+/* ------------------------------ Masthead ------------------------------ */
+
+.masthead {
+  max-width: 62rem;
+  margin: 0 auto;
+  padding: 3rem 1.25rem 1.5rem;
+}
+
+.masthead h1 {
+  font-size: clamp(2rem, 5vw, 3.4rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  max-width: 18ch;
+}
+
+.masthead p {
+  margin: 1rem 0 0;
+  max-width: 52ch;
+  color: var(--ink-soft);
+  font-size: 1.1rem;
+}
+
+.layout {
+  max-width: 62rem;
+  margin: 0 auto;
+  padding: 0 1.25rem 4rem;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 1.5rem;
+}
+
+/* ------------------------------ Form ------------------------------ */
+
+.field-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.75rem;
+}
+
+.field { display: block; }
+
+.field-name {
+  display: block;
+  font-weight: 700;
+  margin-bottom: 0.35rem;
+}
+
+select,
+input[type="number"],
+input[type="search"] {
+  width: 100%;
+  font: inherit;
+  color: var(--ink);
+  background: #fff;
+  border: 1.5px solid var(--line);
+  border-radius: 8px;
+  padding: 0.65rem 0.8rem;
+}
+
+select:hover,
+input[type="number"]:hover,
+input[type="search"]:hover { border-color: var(--green); }
+
+.picker-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.picker-head h2 { font-size: 1.35rem; }
+.picker-head input[type="search"] { max-width: 16rem; }
+
+.category {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 0;
+  padding: 1rem 0 0.5rem;
+}
+
+.category legend {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.05rem;
+  padding: 0 0.6rem 0 0;
+  color: var(--green);
+}
+
+.chips {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+
+.chip { display: block; cursor: pointer; }
+
+/* visually hide the checkbox but keep it keyboard accessible */
+.chip input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.chip-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  height: 100%;
+  padding: 0.55rem 0.75rem 0.55rem 2.2rem;
+  position: relative;
+  border: 1.5px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  transition: background-color 0.12s, border-color 0.12s;
+}
+
+/* custom checkbox square */
+.chip-body::before {
+  content: "";
+  position: absolute;
+  left: 0.7rem;
+  top: 0.8rem;
+  width: 1rem;
+  height: 1rem;
+  border: 1.5px solid var(--ink-soft);
+  border-radius: 4px;
+  background: #fff;
+}
+
+.chip:hover .chip-body { border-color: var(--green); }
+
+.chip input:checked + .chip-body {
+  background: var(--green-pale);
+  border-color: var(--green);
+}
+
+.chip input:checked + .chip-body::before {
+  background: var(--green);
+  border-color: var(--green);
+}
+
+.chip input:checked + .chip-body::after {
+  content: "";
+  position: absolute;
+  left: 1.05rem;
+  top: 0.9rem;
+  width: 0.3rem;
+  height: 0.55rem;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.chip input:focus-visible + .chip-body {
+  outline: 3px solid var(--green);
+  outline-offset: 2px;
+}
+
+.chip-name { font-size: 0.95rem; line-height: 1.3; }
+
+.chip-price {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+
+.chip-price em {
+  font-style: normal;
+  color: var(--sale);
+  margin-left: 0.4rem;
+}
+
+.form-actions {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  margin-top: 1.25rem;
+}
+
+.btn {
+  font: inherit;
+  font-weight: 700;
+  color: #fff;
+  background: var(--green);
+  border: 0;
+  border-radius: 999px;
+  padding: 0.8rem 1.8rem;
+  cursor: pointer;
+}
+
+.btn:hover { background: #17633e; }
+
+.btn-link {
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+
+/* ------------------------------ Results ------------------------------ */
+
+.results { margin-top: 2.5rem; }
+
+.results-title {
+  font-size: clamp(1.5rem, 3.5vw, 2rem);
+  font-weight: 800;
+  margin-bottom: 1rem;
+}
+
+.results-title.muted {
+  margin-top: 2.5rem;
+  color: var(--sale);
+}
+
+.note {
+  margin: -0.25rem 0 1.25rem;
+  color: var(--ink-soft);
+}
+
+.empty h2 { font-size: 1.4rem; margin-bottom: 0.5rem; }
+.empty p { margin: 0; max-width: 55ch; color: var(--ink-soft); }
+
+.card-list {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 1.5rem;
+}
+
+.card.over { border-color: #efc3c9; }
+
+.card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.card h3 { font-size: 1.45rem; font-weight: 800; }
+
+.meta {
+  margin: 0.3rem 0 0;
+  color: var(--ink-soft);
+  font-size: 0.95rem;
+}
+
+/* The price tag: the one loud element on the page */
+.tag {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  min-width: 7.5rem;
+  padding: 0.6rem 1rem 0.6rem 1.6rem;
+  background: var(--tag);
+  color: var(--ink);
+  clip-path: polygon(0.9rem 0, 100% 0, 100% 100%, 0.9rem 100%, 0 50%);
+}
+
+.tag::before {
+  content: "";
+  position: absolute;
+  left: 0.65rem;
+  top: 50%;
+  width: 0.45rem;
+  height: 0.45rem;
+  margin-top: -0.225rem;
+  border-radius: 50%;
+  background: var(--paper);
+}
+
+.tag-total {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.tag-save {
+  margin-top: 0.25rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--sale);
+}
+
+.budget {
+  display: inline-block;
+  margin: 1rem 0 0;
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.budget.ok { background: var(--green-pale); color: var(--green); }
+.budget.no { background: var(--sale-pale); color: var(--sale); }
+
+/* Ingredient table */
+.lines {
+  width: 100%;
+  margin-top: 1.25rem;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.lines th {
+  text-align: left;
+  font-weight: 700;
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+  padding: 0 0.5rem 0.4rem 0;
+  border-bottom: 1.5px solid var(--ink);
+}
+
+.lines td {
+  padding: 0.55rem 0.5rem 0.55rem 0;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+
+.lines .num {
+  text-align: right;
+  white-space: nowrap;
+  padding-right: 0;
+  padding-left: 0.75rem;
+}
+
+.lines tr.pick td { background: var(--green-pale); }
+.lines tr.pick td:first-child { padding-left: 0.5rem; }
+
+.lines tfoot td {
+  border-bottom: 0;
+  border-top: 1.5px solid var(--ink);
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.lines tfoot td:first-child { font-weight: 500; color: var(--ink-soft); }
+
+.badge {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0 0.5rem;
+  border-radius: 999px;
+  background: var(--green);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  vertical-align: 1px;
+}
+
+.pantry {
+  margin: 1rem 0 0;
+  color: var(--ink-soft);
+  font-size: 0.95rem;
+}
+
+.steps { margin-top: 1rem; }
+
+.steps summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--green);
+}
+
+.steps ol {
+  margin: 0.6rem 0 0;
+  padding-left: 1.3rem;
+  max-width: 65ch;
+}
+
+.steps li { margin-bottom: 0.35rem; }
+
+.fine-print {
+  margin: 2rem 0 0;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+}
+
+/* ------------------------------ Small screens ------------------------------ */
+
+@media (max-width: 36rem) {
+  .panel, .card { padding: 1.1rem; }
+  .masthead { padding-top: 2rem; }
+  .lines { font-size: 0.9rem; }
+  .tag { align-self: flex-start; }
+}

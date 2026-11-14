@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Maxi Specials Recipe Finder</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;800&family=Figtree:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<header class="masthead">
+  <h1>This week's Maxi specials, turned into dinner</h1>
+  <p>Pick the sale items you want to use, set a budget, and get recipes with the total cost and what you save.</p>
+</header>
+
+<main class="layout">
+
+  <!-- ===================== Search form ===================== -->
+  <form class="panel finder" method="get" action="{{ url_for('home') }}">
+
+    <div class="field-row">
+      <label class="field">
+        <span class="field-name">Type of food</span>
+        <select name="food_type">
+          <option value="">Any type</option>
+          {% for t in food_types %}
+          <option value="{{ t }}" {% if t == food_type %}selected{% endif %}>{{ t }}</option>
+          {% endfor %}
+        </select>
+      </label>
+
+      <label class="field">
+        <span class="field-name">Your budget ($)</span>
+        <input type="number" name="budget" min="1" step="0.5" inputmode="decimal"
+               placeholder="e.g. 25" value="{{ budget_text }}">
+      </label>
+    </div>
+
+    <div class="picker-head">
+      <h2>Ingredients to use</h2>
+      <input type="search" id="filter" placeholder="Search ingredients" aria-label="Search ingredients">
+    </div>
+
+    {% for category, items in grouped.items() %}
+    <fieldset class="category">
+      <legend>{{ category }}</legend>
+      <div class="chips">
+        {% for item in items %}
+        <label class="chip" data-name="{{ item.name|lower }}">
+          <input type="checkbox" name="ingredients" value="{{ item.id }}"
+                 {% if item.id in selected_ids %}checked{% endif %}>
+          <span class="chip-body">
+            <span class="chip-name">{{ item.name }}</span>
+            <span class="chip-price">
+              ${{ "%.2f"|format(item.price) }}
+              {% if item.money_saved > 0 %}<em>save ${{ "%.2f"|format(item.money_saved) }}</em>{% endif %}
+            </span>
+          </span>
+        </label>
+        {% endfor %}
+      </div>
+    </fieldset>
+    {% endfor %}
+
+    <div class="form-actions">
+      <button type="submit" class="btn">Find recipes</button>
+      <a class="btn-link" href="{{ url_for('home') }}">Clear</a>
+    </div>
+  </form>
+
+  <!-- ===================== Results ===================== -->
+  {% if searched %}
+  <section class="results" aria-live="polite">
+
+    {% if not results %}
+      <div class="panel empty">
+        <h2>No recipes match yet</h2>
+        <p>
+          None of this week's recipes use the ingredients you picked
+          {% if food_type %}in the {{ food_type }} category{% endif %}.
+          Try picking more ingredients, or set the food type to "Any type".
+        </p>
+      </div>
+    {% else %}
+
+      <h2 class="results-title">
+        {{ within|length }} recipe{{ '' if within|length == 1 else 's' }}
+        {% if budget %}within ${{ "%.2f"|format(budget) }}{% else %}found{% endif %}
+      </h2>
+
+      {% if unused_picks %}
+      <p class="note">
+        No recipe uses: {% for i in unused_picks %}{{ i.name }}{% if not loop.last %}, {% endif %}{% endfor %}.
+      </p>
+      {% endif %}
+
+      {% macro recipe_card(r) %}
+      <article class="card {{ '' if r.fits else 'over' }}">
+        <header class="card-head">
+          <div>
+            <h3>{{ r.recipe.name }}</h3>
+            <p class="meta">{{ r.recipe.type }}, {{ r.recipe.time }}{% if selected_ids %}. Uses {{ r.selected_used|length }} of your {{ selected_ids|length }} picks{% endif %}</p>
+          </div>
+
+          <div class="tag" aria-label="Total price">
+            <span class="tag-total">${{ "%.2f"|format(r.total) }}</span>
+            {% if r.saved > 0 %}
+            <span class="tag-save">save ${{ "%.2f"|format(r.saved) }}</span>
+            {% endif %}
+          </div>
+        </header>
+
+        {% if budget %}
+          {% if r.fits %}
+          <p class="budget ok">${{ "%.2f"|format(r.left) }} left in your budget</p>
+          {% else %}
+          <p class="budget no">${{ "%.2f"|format(r.over_by) }} over your budget</p>
+          {% endif %}
+        {% endif %}
+
+        <table class="lines">
+          <thead>
+            <tr><th>Ingredient</th><th>Product on special</th><th class="num">Price</th><th class="num">Saved</th></tr>
+          </thead>
+          <tbody>
+            {% for line in r.lines %}
+            <tr class="{{ 'pick' if line.user_pick else '' }}">
+              <td>{{ line.label }}</td>
+              <td>
+                {{ line.item.name }}
+                {% if line.user_pick %}<span class="badge">your pick</span>{% endif %}
+              </td>
+              <td class="num">${{ "%.2f"|format(line.item.price) }}</td>
+              <td class="num">{% if line.item.money_saved > 0 %}${{ "%.2f"|format(line.item.money_saved) }}{% else %}-{% endif %}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="2">Regular price ${{ "%.2f"|format(r.regular_price) }}</td>
+              <td class="num">${{ "%.2f"|format(r.total) }}</td>
+              <td class="num">${{ "%.2f"|format(r.saved) }}</td>
+            </tr>
+          </tfoot>
+        </table>
+
+        {% if r.recipe.pantry %}
+        <p class="pantry"><strong>From your pantry:</strong> {{ r.recipe.pantry|join(", ") }}</p>
+        {% endif %}
+
+        <details class="steps">
+          <summary>How to make it</summary>
+          <ol>
+            {% for step in r.recipe.steps %}<li>{{ step }}</li>{% endfor %}
+          </ol>
+        </details>
+      </article>
+      {% endmacro %}
+
+      <div class="card-list">
+        {% for r in within %}{{ recipe_card(r) }}{% endfor %}
+      </div>
+
+      {% if over %}
+      <h2 class="results-title muted">Over your budget</h2>
+      <div class="card-list">
+        {% for r in over %}{{ recipe_card(r) }}{% endfor %}
+      </div>
+      {% endif %}
+
+      <p class="fine-print">
+        Prices are for the whole package as sold, so you may have leftovers.
+        Pantry items are not included in the totals.
+      </p>
+    {% endif %}
+  </section>
+  {% endif %}
+
+</main>
+
+<script>
+  // Live filter for the ingredient list
+  const filter = document.getElementById("filter");
+  filter.addEventListener("input", () => {
+    const q = filter.value.trim().toLowerCase();
+    document.querySelectorAll(".chip").forEach(chip => {
+      chip.hidden = q && !chip.dataset.name.includes(q);
+    });
+    document.querySelectorAll(".category").forEach(group => {
+      group.hidden = !group.querySelector(".chip:not([hidden])");
+    });
+  });
+</script>
+
+</body>
+</html>
